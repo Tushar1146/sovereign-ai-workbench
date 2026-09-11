@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sovereign AI Workbench</title>
+  <style>
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,Arial;background:#0b1020;color:#eef2ff}
+    .app{max-width:1200px;margin:auto;min-height:100vh;display:grid;grid-template-columns:230px 1fr}
+    aside{border-right:1px solid #26304a;padding:24px 16px;background:#0e1426}
+    main{display:flex;flex-direction:column;min-width:0}
+    .brand{font-weight:800;font-size:18px;margin:0 0 6px}.sub{font-size:12px;color:#8e9ab8;margin-bottom:28px}
+    nav button{display:block;width:100%;text-align:left;background:transparent;color:#aeb9d4;border:0;padding:12px;border-radius:10px;margin:3px 0;cursor:pointer}
+    nav button.active,nav button:hover{background:#18213a;color:#fff}
+    header{padding:20px 26px;border-bottom:1px solid #26304a;display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .title{font-size:20px;font-weight:750}.status{font-size:12px;background:#123222;color:#75e6a4;padding:7px 10px;border-radius:999px}
+    .content{padding:24px;display:grid;grid-template-columns:1fr 280px;gap:20px}
+    .chat{background:#11182c;border:1px solid #26304a;border-radius:16px;min-height:620px;display:flex;flex-direction:column}
+    #messages{padding:20px;flex:1;overflow:auto}.msg{margin:12px 0;max-width:82%;padding:12px 14px;border-radius:12px;white-space:pre-wrap;line-height:1.5}
+    .user{margin-left:auto;background:#304a88}.ai{background:#1a243b;border:1px solid #2b3855}
+    form{display:flex;gap:10px;padding:16px;border-top:1px solid #26304a}
+    input[type=text]{flex:1;background:#0b1020;color:#fff;border:1px solid #35425f;border-radius:10px;padding:13px}
+    button.send,.upload{background:#5f7cff;color:white;border:0;border-radius:10px;padding:12px 16px;cursor:pointer}
+    .panel{background:#11182c;border:1px solid #26304a;border-radius:16px;padding:16px;height:max-content}
+    .panel h3{font-size:14px;margin:0 0 14px}.metric{padding:12px 0;border-bottom:1px solid #26304a;font-size:13px;color:#b9c3d9}
+    .metric b{float:right;color:#fff}.docs{margin-top:12px}.doc{font-size:12px;color:#aeb9d4;padding:8px 0;border-bottom:1px solid #202a42;word-break:break-word}
+    .drop{border:1px dashed #425071;border-radius:10px;padding:14px;text-align:center;color:#8f9ab6;font-size:12px;margin-top:12px}
+    input[type=file]{display:none}.source{font-size:11px;color:#79a7ff;margin-top:8px}
+    @media(max-width:850px){.app{grid-template-columns:1fr}aside{display:none}.content{grid-template-columns:1fr}.chat{min-height:520px}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">🔒 Sovereign AI</div>
+    <div class="sub">SIH26117 Prototype</div>
+    <nav>
+      <button class="active">💬 AI Workspace</button>
+      <button>📁 Knowledge Base</button>
+      <button>🤖 Agents</button>
+      <button>🧠 Local Models</button>
+      <button>🔐 Audit & Security</button>
+    </nav>
+  </aside>
+  <main>
+    <header>
+      <div><div class="title">Private AI Workbench</div><div class="sub" style="margin:3px 0 0">Enterprise data stays inside this environment</div></div>
+      <div class="status">● LOCAL / PRIVATE</div>
+    </header>
+    <div class="content">
+      <section class="chat">
+        <div id="messages">
+          <div class="msg ai">Hello. I'm your private enterprise AI assistant.<br><br>Upload a document, then ask me something about it. If Ollama is installed, I can use a real local LLM; otherwise this prototype runs in demo mode.</div>
+        </div>
+        <form id="chatForm">
+          <input id="message" type="text" placeholder="Ask about your private documents..." autocomplete="off">
+          <button class="send" type="submit">Send</button>
+        </form>
+      </section>
+      <aside class="panel">
+        <h3>Security</h3>
+        <div class="metric">Processing <b>LOCAL</b></div>
+        <div class="metric">External AI APIs <b>0</b></div>
+        <div class="metric">Internet for AI <b>NO</b></div>
+        <div class="metric">Documents <b id="docCount">0</b></div>
+        <h3 style="margin-top:20px">Knowledge Base</h3>
+        <label class="drop">
+          📄 Click to upload PDF / TXT / MD / CSV
+          <input id="file" type="file" accept=".pdf,.txt,.md,.csv">
+        </label>
+        <div id="docs" class="docs"></div>
+        <div id="model" class="source">Checking local model...</div>
+      </aside>
+    </div>
+  </main>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+function addMsg(text, who, sources=[]) {
+  const div=document.createElement("div"); div.className="msg "+who; div.textContent=text;
+  if(sources.length){const s=document.createElement("div"); s.className="source"; s.textContent="Sources: "+sources.join(", "); div.appendChild(s);}
+  $("messages").appendChild(div); $("messages").scrollTop=$("messages").scrollHeight;
+}
+async function refresh(){
+  const [s,d]=await Promise.all([fetch("/api/status").then(r=>r.json()),fetch("/api/documents").then(r=>r.json())]);
+  $("docCount").textContent=s.documents;
+  $("model").textContent=s.ollama ? "Model: "+s.model : "Model: Demo mode (install Ollama for local LLM)";
+  $("docs").innerHTML=d.map(x=>`<div class="doc">📄 ${x.name}<br>${x.size.toLocaleString()} chars</div>`).join("");
+}
+$("file").addEventListener("change",async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const fd=new FormData(); fd.append("file",f);
+  const r=await fetch("/api/upload",{method:"POST",body:fd}); const j=await r.json();
+  addMsg(j.ok ? `Uploaded ${j.name}. It is now available in the local knowledge base.` : "Upload failed: "+j.error,"ai");
+  refresh(); e.target.value="";
+});
+$("chatForm").addEventListener("submit",async e=>{
+  e.preventDefault(); const input=$("message"); const text=input.value.trim(); if(!text)return;
+  addMsg(text,"user"); input.value=""; addMsg("Thinking locally...","ai");
+  const pending=$("messages").lastElementChild;
+  try{
+    const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
+    const j=await r.json(); pending.remove(); addMsg(j.answer,"ai",j.sources||[]);
+  }catch(err){pending.remove();addMsg("Backend error. Make sure FastAPI is running.","ai");}
+});
+refresh();
+</script>
+</body>
+</html>
